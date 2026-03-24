@@ -1,6 +1,6 @@
 {
   "name": "@0xprotovox/deficlaw",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "DeFi MCP Server for Claude Code — token analysis, prices, trending, holder intelligence",
   "author": "0xprotovox",
   "license": "MIT",
@@ -9,6 +9,19 @@
     "deficlaw": "dist/index.js"
   },
   "main": "dist/server.js",
+  "types": "dist/server.d.ts",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/0xprotovox/deficlaw.git"
+  },
+  "bugs": {
+    "url": "https://github.com/0xprotovox/deficlaw/issues"
+  },
+  "homepage": "https://github.com/0xprotovox/deficlaw#readme",
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
@@ -41,6 +54,9 @@
     "crypto",
     "token-analysis",
     "claude-code",
-    "ai-tools"
+    "ai-tools",
+    "dexscreener",
+    "gmgn",
+    "risk-scoring"
   ]
 }
