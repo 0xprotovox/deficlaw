@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * defi-mcp — DeFi MCP Server for Claude Code
+ * deficlaw — DeFi MCP Server for Claude Code
  * First open-source DeFi MCP. Token analysis, prices, trending, holder intelligence.
  * by @0xprotovox
  */

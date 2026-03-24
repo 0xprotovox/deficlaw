@@ -13,7 +13,7 @@ import { formatAnalysis } from './analysis/formatOutput.js';
 
 export function createServer(): McpServer {
   const server = new McpServer({
-    name: 'defi-mcp',
+    name: 'deficlaw',
     version: '0.1.0',
   });
 

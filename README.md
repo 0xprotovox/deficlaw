@@ -1,4 +1,4 @@
-# defi-mcp
+# DefiClaw
 
 **The first open-source DeFi MCP server for Claude Code.**
 
@@ -16,11 +16,11 @@ Contract looks safe: mint and freeze authorities revoked.
 🟢 Lower risk profile based on available data.
 ```
 
-## Why defi-mcp?
+## Why deficlaw?
 
 Claude Code can write code, fix bugs, deploy apps. But ask it "what's the price of BONK?" and it says *"I don't have real-time data."*
 
-**defi-mcp fixes that.** It gives Claude Code real-time access to DeFi data across Solana and 10+ chains.
+**deficlaw fixes that.** It gives Claude Code real-time access to DeFi data across Solana and 10+ chains.
 
 - **Token Analysis** with holder intelligence, risk scoring, KOL tracking
 - **Real-time Prices** from DexScreener across all major chains
@@ -34,12 +34,12 @@ Claude Code can write code, fix bugs, deploy apps. But ask it "what's the price 
 
 ```bash
 # Clone and build
-git clone https://github.com/0xprotovox/defi-mcp.git
-cd defi-mcp
+git clone https://github.com/0xprotovox/deficlaw.git
+cd deficlaw
 npm install && npm run build
 
 # Add to Claude Code
-claude mcp add defi -- node /path/to/defi-mcp/dist/index.js
+claude mcp add defi -- node /path/to/deficlaw/dist/index.js
 ```
 
 Then just ask Claude naturally:
@@ -157,7 +157,7 @@ The risk scorer analyzes 6 dimensions to produce a 0-100 score:
 ## Architecture
 
 ```
-Claude Code ←→ MCP stdio ←→ defi-mcp server
+Claude Code ←→ MCP stdio ←→ deficlaw server
                                  │
                     ┌────────────┼────────────┐
                     │            │            │
@@ -188,7 +188,7 @@ Add to your project's `.mcp.json`:
   "mcpServers": {
     "defi": {
       "command": "node",
-      "args": ["/path/to/defi-mcp/dist/index.js"],
+      "args": ["/path/to/deficlaw/dist/index.js"],
       "env": {
         "SOLANA_RPC_URL": "https://your-rpc.com"
       }
@@ -209,7 +209,7 @@ Add to your project's `.mcp.json`:
 - [ ] Slippage estimation (Jupiter quotes)
 - [ ] Token comparison (side by side)
 - [ ] Multi-chain holder analysis
-- [ ] npm package (`npm install -g defi-mcp`)
+- [ ] npm package (`npm install -g deficlaw`)
 - [ ] Price alerts via MCP resources
 
 ## Built With

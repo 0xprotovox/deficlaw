@@ -1,12 +1,12 @@
 {
-  "name": "defi-mcp",
-  "version": "0.1.0",
+  "name": "@0xprotovox/deficlaw",
+  "version": "0.1.1",
   "description": "DeFi MCP Server for Claude Code — token analysis, prices, trending, holder intelligence",
   "author": "0xprotovox",
   "license": "MIT",
   "type": "module",
   "bin": {
-    "defi-mcp": "dist/index.js"
+    "deficlaw": "dist/index.js"
   },
   "main": "dist/server.js",
   "scripts": {
