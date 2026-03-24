@@ -23,10 +23,13 @@ Claude Code can write code, fix bugs, deploy apps. But ask it "what's the price 
 **deficlaw fixes that.** It gives Claude Code real-time access to DeFi data across Solana and 10+ chains.
 
 - **Token Analysis** with holder intelligence, risk scoring, KOL tracking
+- **Token Search** by name or symbol across all chains
+- **New Launches** detection with age, mcap, liquidity data
 - **Real-time Prices** from DexScreener across all major chains
 - **Trending Tokens** with volume, liquidity, and boost data
 - **Top Traders** showing who made and lost money on any token
 - **Contract Security** checking mint/freeze authority on Solana
+- **Actionable Verdicts** (BUY/SELL/NEUTRAL/AVOID) based on combined data signals
 - **~1.5 second** full analysis (not 11 seconds like browser-based scrapers)
 - **Zero config** - no API keys, no wallets, no accounts needed
 
@@ -53,6 +56,8 @@ Then just ask Claude naturally:
 ```
 > "analyze this token: 3oQw...pump"
 > "what's the price of BONK?"
+> "search for BONK token"
+> "show me new launches on solana in the last 30 minutes"
 > "show me trending tokens on solana"
 > "who made money on JUP token?"
 ```
@@ -84,6 +89,43 @@ Full token analysis with holder intelligence, risk scoring, and human-readable s
 - Top 20 holders table with PnL and tags
 - KOL list with Twitter handles
 - Human-readable summary with actionable insights
+
+### `search_token`
+
+Search for tokens by name or symbol. Returns top matches across all chains.
+
+```
+> "search for BONK"
+
+Results:
+1. Bonk (BONK) -- solana -- $0.000024 -- $1.8B mcap
+2. BonkBot (BONK) -- ethereum -- $0.00001 -- $2M mcap
+```
+
+**Input:**
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `query` | string | required | Token name or symbol |
+| `chain` | string | all | Filter by chain |
+| `limit` | number | `10` | Results to return (1-20) |
+
+### `get_new_launches`
+
+Get recently created tokens on a blockchain, sorted by creation time.
+
+```
+> "new launches on solana last 30 minutes"
+
+1. NEWTOKEN -- 12m old -- $0.001 -- $50K mcap -- $15K liq
+2. LAUNCH2 -- 25m old -- $0.0005 -- $20K mcap -- $8K liq
+```
+
+**Input:**
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `chain` | string | `"solana"` | Blockchain |
+| `max_age_minutes` | number | `60` | Max token age in minutes (5-1440) |
+| `limit` | number | `20` | Tokens to return (1-50) |
 
 ### `get_price`
 
@@ -186,6 +228,9 @@ Claude Code <-> MCP stdio <-> deficlaw server
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `SOLANA_RPC_URL` | `https://api.mainnet-beta.solana.com` | Custom Solana RPC endpoint |
+| `DEFICLAW_CACHE_TTL` | `120000` (2 min) | GMGN holder cache TTL in milliseconds |
+| `DEFICLAW_PRICE_CACHE_TTL` | `30000` (30s) | Price cache TTL in milliseconds |
+| `DEBUG` | (unset) | Set to `deficlaw` to enable debug logging to stderr |
 
 ### Claude Code Config
 
@@ -198,7 +243,10 @@ Add to your project's `.mcp.json`:
       "command": "npx",
       "args": ["-y", "@0xprotovox/deficlaw"],
       "env": {
-        "SOLANA_RPC_URL": "https://your-rpc.com"
+        "SOLANA_RPC_URL": "https://your-rpc.com",
+        "DEFICLAW_CACHE_TTL": "120000",
+        "DEFICLAW_PRICE_CACHE_TTL": "30000",
+        "DEBUG": "deficlaw"
       }
     }
   }
@@ -227,7 +275,12 @@ Or if installed from source:
 - [x] Human-readable AI summary
 - [x] Top traders (winners/losers)
 - [x] npm package (`npm install -g @0xprotovox/deficlaw`)
-- [ ] Token search by name/symbol
+- [x] Token search by name/symbol
+- [x] New launches detection
+- [x] Actionable verdict (BUY/SELL/NEUTRAL/AVOID)
+- [x] Configurable cache TTL via env vars
+- [x] Debug logging (DEBUG=deficlaw)
+- [x] Non-blocking async GMGN fetches
 - [ ] Slippage estimation (Jupiter quotes)
 - [ ] Token comparison (side by side)
 - [ ] Multi-chain holder analysis
