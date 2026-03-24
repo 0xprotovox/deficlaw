@@ -1,4 +1,4 @@
-# DefiClaw
+# deficlaw
 
 **The first open-source DeFi MCP server for Claude Code.**
 
@@ -7,13 +7,13 @@ Analyze any Solana token in seconds. Holder intelligence, risk scoring, smart mo
 ```
 > "analyze token 3oQwNvAfZMuPWjVPC12ukY7RPA9JiGwLod6Pr4Lkpump"
 
-═══ SUMMARY ═══
+=== SUMMARY ===
 POKE6900 is a 9mo old PumpSwap token with $25.9K liquidity and $34.5K market cap.
 53 diamond hands (53.0%), strong holder conviction.
 Only 18.0% of holders are in profit, most are underwater with avg loss of $844 per wallet.
 Buy pressure is strong at 3.3:1 ratio (1093 buys vs 395 sells), accumulation phase.
 Contract looks safe: mint and freeze authorities revoked.
-🟢 Lower risk profile based on available data.
+Lower risk profile based on available data.
 ```
 
 ## Why deficlaw?
@@ -27,18 +27,24 @@ Claude Code can write code, fix bugs, deploy apps. But ask it "what's the price 
 - **Trending Tokens** with volume, liquidity, and boost data
 - **Top Traders** showing who made and lost money on any token
 - **Contract Security** checking mint/freeze authority on Solana
-- **1.5 second** full analysis (not 11 seconds like browser-based scrapers)
+- **~1.5 second** full analysis (not 11 seconds like browser-based scrapers)
 - **Zero config** - no API keys, no wallets, no accounts needed
 
-## Quick Start
+## Install
+
+### Option A: npm (recommended)
 
 ```bash
-# Clone and build
+npm install -g @0xprotovox/deficlaw
+claude mcp add defi -- deficlaw
+```
+
+### Option B: From source
+
+```bash
 git clone https://github.com/0xprotovox/deficlaw.git
 cd deficlaw
 npm install && npm run build
-
-# Add to Claude Code
 claude mcp add defi -- node /path/to/deficlaw/dist/index.js
 ```
 
@@ -81,12 +87,12 @@ Full token analysis with holder intelligence, risk scoring, and human-readable s
 
 ### `get_price`
 
-Quick price lookup. Sub-second response.
+Quick price lookup. Sub-second response. Supports both token addresses and name/symbol search.
 
 ```
 > "price of So11111112222..."
 
-BONK — $0.000024 (+5.2% 24h)
+BONK -- $0.000024 (+5.2% 24h)
 Volume: $142M | Liquidity: $12M | MCap: $1.8B
 ```
 
@@ -97,9 +103,9 @@ Trending and boosted tokens on any chain.
 ```
 > "trending tokens on solana"
 
-1. BONK — $0.000024 (+12%) — $142M volume
-2. WIF  — $0.89 (-2.1%)   — $89M volume
-3. JUP  — $0.94 (+3.5%)   — $45M volume
+1. BONK -- $0.000024 (+12%) -- $142M volume
+2. WIF  -- $0.89 (-2.1%)   -- $89M volume
+3. JUP  -- $0.94 (+3.5%)   -- $45M volume
 ...
 ```
 
@@ -110,13 +116,13 @@ Who made and lost money on a token. Winners, losers, PnL, tags.
 ```
 > "who profited on this token?"
 
-🏆 Top Winners:
-1. CR5N... — +$680 (+124%) 🟢 still holding
-2. EsRB... — +$166 (+16%) 💎 diamond hands
+Top Winners:
+1. CR5N... -- +$680 (+124%) still holding
+2. EsRB... -- +$166 (+16%) diamond hands
 
-💀 Top Losers:
-1. BgeeV... — -$7,548 (-65%) 💎 diamond hands (!)
-2. 5vqid... — -$5,420 (-50%) gmgn user
+Top Losers:
+1. BgeeV... -- -$7,548 (-65%) diamond hands (!)
+2. 5vqid... -- -$5,420 (-50%) gmgn user
 ```
 
 ## Data Sources
@@ -141,34 +147,36 @@ Holder analysis (GMGN) currently supports **Solana** tokens.
 
 ## Risk Scoring
 
-The risk scorer analyzes 6 dimensions to produce a 0-100 score:
+The risk scorer analyzes 8 dimensions to produce a 0-100 score:
 
-| Dimension | Weight | What it checks |
-|-----------|--------|----------------|
-| Liquidity | 25% | Pool depth in USD |
-| Token Age | 10% | Time since creation |
-| Holder Concentration | 20% | Top 10 holder % |
-| Dev Wallet | 20% | Dev holdings and selling behavior |
-| Fresh Wallets | 15% | New wallet % (possible wash/bundle) |
-| Sniper Activity | 10% | Bot/sniper wallets in top holders |
+| Dimension | Max Points | What it checks |
+|-----------|-----------|----------------|
+| Liquidity | 22 | Pool depth in USD |
+| Token Age | 10 | Time since creation |
+| Volume Anomalies | 8 | Wash trading signals, vol/mcap ratio |
+| Holder Concentration | 18 | Top 10 holder % |
+| Dev Wallet | 15 | Dev holdings and selling behavior |
+| Fresh Wallets | 12 | New wallet % (possible wash/bundle) |
+| Sniper Activity | 10 | Bot/sniper wallets in top holders |
+| Contract Security | 5 | Mint/freeze authority status |
 
-**Levels:** 🟢 LOW (0-19) | 🟡 MEDIUM (20-44) | 🟠 HIGH (45-69) | 🔴 CRITICAL (70-100)
+**Levels:** LOW (0-19) | MEDIUM (20-44) | HIGH (45-69) | CRITICAL (70-100)
 
 ## Architecture
 
 ```
-Claude Code ←→ MCP stdio ←→ deficlaw server
-                                 │
-                    ┌────────────┼────────────┐
-                    │            │            │
+Claude Code <-> MCP stdio <-> deficlaw server
+                                 |
+                    +------------+------------+
+                    |            |            |
               DexScreener    GMGN API    Solana RPC
               (prices)     (holders)    (security)
 ```
 
 - **MCP SDK** for Claude Code integration
 - **curl-based GMGN fetcher** bypasses Cloudflare (Playwright fallback if needed)
-- **In-memory TTL cache** prevents rate limiting
-- **Rate limiter** for DexScreener (150 req/min)
+- **In-memory TTL cache** with automatic cleanup prevents rate limiting
+- **Rate limiter** with retry logic for DexScreener (150 req/min)
 - **TypeScript** with full type safety
 
 ## Configuration
@@ -187,8 +195,8 @@ Add to your project's `.mcp.json`:
 {
   "mcpServers": {
     "defi": {
-      "command": "node",
-      "args": ["/path/to/deficlaw/dist/index.js"],
+      "command": "npx",
+      "args": ["-y", "@0xprotovox/deficlaw"],
       "env": {
         "SOLANA_RPC_URL": "https://your-rpc.com"
       }
@@ -197,19 +205,32 @@ Add to your project's `.mcp.json`:
 }
 ```
 
+Or if installed from source:
+
+```json
+{
+  "mcpServers": {
+    "defi": {
+      "command": "node",
+      "args": ["/path/to/deficlaw/dist/index.js"]
+    }
+  }
+}
+```
+
 ## Roadmap
 
 - [x] Token analysis with holder intelligence
-- [x] Risk scoring (6 dimensions)
+- [x] Risk scoring (8 dimensions)
 - [x] Contract security checks
 - [x] KOL detection with Twitter handles
 - [x] Human-readable AI summary
 - [x] Top traders (winners/losers)
+- [x] npm package (`npm install -g @0xprotovox/deficlaw`)
 - [ ] Token search by name/symbol
 - [ ] Slippage estimation (Jupiter quotes)
 - [ ] Token comparison (side by side)
 - [ ] Multi-chain holder analysis
-- [ ] npm package (`npm install -g deficlaw`)
 - [ ] Price alerts via MCP resources
 
 ## Built With
