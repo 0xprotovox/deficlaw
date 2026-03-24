@@ -262,5 +262,81 @@ export function generateSummary(data: SummaryInput): string {
     }
   }
 
+  // ── Actionable Verdict (data-driven signal) ──
+  const verdict = computeVerdict(data);
+  lines.push('');
+  lines.push(`VERDICT: ${verdict.signal}`);
+  lines.push(verdict.reason);
+  lines.push('(Not financial advice. This is a data-driven signal based on on-chain metrics only.)');
+
   return lines.join('\n');
+}
+
+interface Verdict {
+  signal: 'BUY SIGNAL' | 'NEUTRAL' | 'SELL SIGNAL' | 'AVOID';
+  reason: string;
+}
+
+function computeVerdict(data: SummaryInput): Verdict {
+  const { price, market, risk, holders, kols } = data;
+
+  // AVOID: critical risk or very low liquidity
+  if (risk.score >= 70 || market.liquidity < 1000) {
+    return { signal: 'AVOID', reason: 'Too many red flags. Critical risk score or dangerously low liquidity.' };
+  }
+
+  // AVOID: zero volume dead token
+  if (market.volume24h < 500 && market.volume1h === 0) {
+    return { signal: 'AVOID', reason: 'Token appears dead with no trading activity.' };
+  }
+
+  let bullPoints = 0;
+  let bearPoints = 0;
+
+  // Price momentum
+  if (price.change24h > 20) bullPoints += 2;
+  else if (price.change24h > 5) bullPoints += 1;
+  else if (price.change24h < -20) bearPoints += 2;
+  else if (price.change24h < -5) bearPoints += 1;
+
+  if (price.change1h > 10) bullPoints += 1;
+  else if (price.change1h < -10) bearPoints += 1;
+
+  // Volume health
+  if (market.volumeLiquidityRatio > 2 && market.volumeLiquidityRatio < 10) bullPoints += 1;
+  else if (market.volumeLiquidityRatio > 10) bearPoints += 1; // suspicious
+
+  // Holder sentiment
+  if (holders) {
+    if (holders.sentiment.profitRatio > 0.50) bullPoints += 1;
+    else if (holders.sentiment.profitRatio < 0.15) bearPoints += 1;
+
+    if (holders.pressure.buySellRatio > 2) bullPoints += 1;
+    else if (holders.pressure.buySellRatio < 0.5) bearPoints += 1;
+
+    if (holders.concentration.top10Pct > 0.50) bearPoints += 1;
+    if (holders.categories.snipers > 5) bearPoints += 1;
+    if (holders.categories.smartMoney > 0) bullPoints += 1;
+    if (holders.categories.diamondHands > holders.total * 0.3) bullPoints += 1;
+  }
+
+  // KOL sentiment
+  if (kols && kols.length >= 2) {
+    const holding = kols.filter(k => k.status === 'holding').length;
+    if (holding > kols.length * 0.7) bullPoints += 1;
+    if (holding < kols.length * 0.3) bearPoints += 1;
+  }
+
+  // Risk penalty
+  if (risk.score >= 45) bearPoints += 2;
+  else if (risk.score >= 20) bearPoints += 1;
+
+  const net = bullPoints - bearPoints;
+
+  if (net >= 3) return { signal: 'BUY SIGNAL', reason: `Strong bullish indicators: ${bullPoints} bull vs ${bearPoints} bear signals. Momentum, holder sentiment, and volume align.` };
+  if (net >= 1) return { signal: 'BUY SIGNAL', reason: `Mildly bullish: ${bullPoints} bull vs ${bearPoints} bear signals. Some positive indicators but not overwhelming.` };
+  if (net <= -3) return { signal: 'SELL SIGNAL', reason: `Strong bearish indicators: ${bearPoints} bear vs ${bullPoints} bull signals. Consider reducing exposure.` };
+  if (net <= -1) return { signal: 'SELL SIGNAL', reason: `Mildly bearish: ${bearPoints} bear vs ${bullPoints} bull signals. Caution advised.` };
+
+  return { signal: 'NEUTRAL', reason: `Mixed signals: ${bullPoints} bull vs ${bearPoints} bear. No clear direction from current data.` };
 }
