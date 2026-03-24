@@ -5,9 +5,10 @@
  */
 import { MemoryCache } from '../cache/memoryCache.js';
 import type { Holder } from '../types/index.js';
-import { execSync } from 'child_process';
+import { exec } from 'child_process';
+import { debug } from '../utils/debug.js';
 
-const CACHE_TTL = 2 * 60 * 1000;
+const CACHE_TTL = parseInt(process.env.DEFICLAW_CACHE_TTL ?? '', 10) || 2 * 60 * 1000;
 const BASE_URL = 'https://gmgn.ai/vas/api/v1';
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
 const SCRAPE_TIMEOUT = 40_000;
@@ -26,28 +27,49 @@ const holderCache = new MemoryCache<HolderResult>(CACHE_TTL);
 /**
  * Try fetching via curl (bypasses Node.js TLS fingerprint detection).
  * Returns parsed data on success, null on any failure.
+ * Uses async exec to avoid blocking the event loop.
  */
-function curlFetch(path: string): Record<string, unknown> | null {
-  try {
+function curlFetch(path: string): Promise<Record<string, unknown> | null> {
+  return new Promise((resolve) => {
     const url = `${BASE_URL}${path}`;
     const cmd = `curl -s --max-time 10 "${url}" -H "User-Agent: ${UA}"`;
-    const out = execSync(cmd, { timeout: 12_000 }).toString();
+    const start = Date.now();
 
-    // Cloudflare sometimes returns HTML instead of JSON
-    if (!out || out.startsWith('<!') || out.startsWith('<html')) return null;
+    exec(cmd, { timeout: 12_000 }, (error, stdout) => {
+      if (error) {
+        debug(`curl failed for ${path}: ${error.message}`);
+        resolve(null);
+        return;
+      }
 
-    let json: { code?: number; data?: Record<string, unknown> };
-    try {
-      json = JSON.parse(out);
-    } catch {
-      return null; // Malformed JSON
-    }
+      const out = stdout.toString();
+      debug(`curl ${path} completed in ${Date.now() - start}ms (${out.length} bytes)`);
 
-    if (json.code !== 0 || !json.data) return null;
-    return json.data;
-  } catch {
-    return null;
-  }
+      // Cloudflare sometimes returns HTML instead of JSON
+      if (!out || out.startsWith('<!') || out.startsWith('<html')) {
+        debug(`curl ${path} returned HTML (Cloudflare block)`);
+        resolve(null);
+        return;
+      }
+
+      let json: { code?: number; data?: Record<string, unknown> };
+      try {
+        json = JSON.parse(out);
+      } catch {
+        debug(`curl ${path} returned malformed JSON`);
+        resolve(null);
+        return;
+      }
+
+      if (json.code !== 0 || !json.data) {
+        debug(`curl ${path} returned error code: ${json.code}`);
+        resolve(null);
+        return;
+      }
+
+      resolve(json.data);
+    });
+  });
 }
 
 /** Safely extract a string array of tags from raw GMGN holder data */
@@ -259,18 +281,20 @@ export async function getHolders(address: string): Promise<HolderResult> {
   const cached = holderCache.get(address);
   if (cached) return cached;
 
-  // Strategy 1: curl (fast, ~1s)
-  const curlData = curlFetch(`/token_holders/sol/${address}?limit=100`);
+  // Strategy 1: curl (fast, ~1s, async to avoid blocking event loop)
+  debug(`Fetching holders for ${address} via curl`);
+  const curlData = await curlFetch(`/token_holders/sol/${address}?limit=100`);
   if (curlData && Array.isArray((curlData as Record<string, unknown>).list) &&
       ((curlData as Record<string, unknown>).list as unknown[]).length > 0) {
-    // Fetch KOL holders in parallel-ish (curl is sync but fast)
-    const kolData = curlFetch(`/token_holders/sol/${address}?tag=renowned&limit=50`);
+    // Fetch KOL holders in parallel (now truly async)
+    const kolData = await curlFetch(`/token_holders/sol/${address}?tag=renowned&limit=50`);
     const holders = normalizeHolders((curlData as Record<string, unknown>).list);
     const kolHolders = normalizeHolders(
       kolData ? (kolData as Record<string, unknown>).list : []
     );
     const result: HolderResult = { holders, kolHolders };
     holderCache.set(address, result);
+    debug(`Holders for ${address}: ${holders.length} holders, ${kolHolders.length} KOLs (via curl)`);
     return result;
   }
 
