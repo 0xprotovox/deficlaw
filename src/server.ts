@@ -10,12 +10,14 @@ import { handleAnalyzeToken } from './tools/analyzeToken.js';
 import { handleGetPrice } from './tools/getPrice.js';
 import { handleGetTrending } from './tools/getTrending.js';
 import { handleGetTopTraders } from './tools/getTopTraders.js';
+import { handleSearchToken } from './tools/searchToken.js';
+import { handleGetNewLaunches } from './tools/getNewLaunches.js';
 import { formatAnalysis } from './analysis/formatOutput.js';
 
 export function createServer(): McpServer {
   const server = new McpServer({
     name: 'deficlaw',
-    version: '0.2.0',
+    version: '0.3.0',
   });
 
   // ── analyze_token ──
@@ -101,6 +103,52 @@ export function createServer(): McpServer {
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: `Top traders fetch failed: ${message}` }) }], isError: true };
+      }
+    }
+  );
+
+  // ── search_token ──
+  server.tool(
+    'search_token',
+    'Search for tokens by name or symbol. Returns top matches with address, price, chain, volume, and liquidity.',
+    {
+      query: z.string().min(1).describe('Token name or symbol to search for (e.g. "BONK", "Jupiter")'),
+      chain: z.string().optional().describe('Filter by blockchain: solana, ethereum, bsc, base, arbitrum. Omit for all chains.'),
+      limit: z.number().min(1).max(20).default(10).describe('Number of results to return (1-20)'),
+    },
+    async (args) => {
+      try {
+        const result = await handleSearchToken(args);
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
+          ...('error' in result ? { isError: true } : {}),
+        };
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: `Token search failed: ${message}` }) }], isError: true };
+      }
+    }
+  );
+
+  // ── get_new_launches ──
+  server.tool(
+    'get_new_launches',
+    'Get recently created tokens on a blockchain. Shows name, symbol, address, age, market cap, liquidity, and volume.',
+    {
+      chain: z.string().default('solana').describe('Blockchain: solana, ethereum, bsc, base, arbitrum'),
+      max_age_minutes: z.number().min(5).max(1440).default(60).describe('Maximum token age in minutes (5-1440)'),
+      limit: z.number().min(1).max(50).default(20).describe('Number of tokens to return (1-50)'),
+    },
+    async (args) => {
+      try {
+        const result = await handleGetNewLaunches(args);
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
+          ...('error' in result ? { isError: true } : {}),
+        };
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: `New launches fetch failed: ${message}` }) }], isError: true };
       }
     }
   );
