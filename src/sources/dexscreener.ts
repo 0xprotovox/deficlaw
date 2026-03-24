@@ -5,10 +5,11 @@
  */
 import { MemoryCache } from '../cache/memoryCache.js';
 import type { DexPair, PriceResult, TrendingToken, DexBoostEntry } from '../types/index.js';
+import { debug } from '../utils/debug.js';
 
 const BASE_URL = 'https://api.dexscreener.com';
 const PAIR_CACHE_TTL = 5 * 60 * 1000;   // 5 min
-const PRICE_CACHE_TTL = 30 * 1000;       // 30s
+const PRICE_CACHE_TTL = parseInt(process.env.DEFICLAW_PRICE_CACHE_TTL ?? '', 10) || 30 * 1000;
 const TRENDING_CACHE_TTL = 30 * 1000;    // 30s
 const MAX_RETRIES = 2;
 
@@ -75,7 +76,11 @@ export async function getTokenPair(address: string, chain = 'solana'): Promise<D
 
   const cacheKey = `${chain}:${address}`;
   const cached = pairCache.get(cacheKey);
-  if (cached) return cached;
+  if (cached) {
+    debug(`pair cache HIT: ${cacheKey}`);
+    return cached;
+  }
+  debug(`pair cache MISS: ${cacheKey}`);
 
   const data = await throttledFetch<{ pairs?: DexPair[] }>(`${BASE_URL}/latest/dex/tokens/${address}`);
   const pairs: DexPair[] = data.pairs ?? [];
@@ -98,7 +103,11 @@ export async function getPrice(address: string, chain = 'solana'): Promise<Price
 
   const cacheKey = `price:${chain}:${address}`;
   const cached = priceCache.get(cacheKey);
-  if (cached) return cached;
+  if (cached) {
+    debug(`price cache HIT: ${cacheKey}`);
+    return cached;
+  }
+  debug(`price cache MISS: ${cacheKey}`);
 
   const pair = await getTokenPair(address, chain);
   if (!pair) return null;
@@ -130,6 +139,59 @@ export async function searchTokens(query: string): Promise<DexPair[]> {
     `${BASE_URL}/latest/dex/search?q=${encodeURIComponent(query)}`
   );
   return (data.pairs ?? []).slice(0, 20);
+}
+
+/** Get recently created token pairs on a chain, sorted by creation time desc */
+export async function getNewPairs(chain = 'solana', maxAgeMinutes = 60, limit = 20): Promise<DexPair[]> {
+  const clampedLimit = Math.min(Math.max(1, limit), 50);
+  const cacheKey = `newpairs:${chain}:${maxAgeMinutes}`;
+  const cached = trendingCache.get(cacheKey);
+  if (cached) {
+    debug(`newpairs cache HIT: ${cacheKey}`);
+    return cached.slice(0, clampedLimit) as unknown as DexPair[];
+  }
+
+  debug(`Fetching new pairs for ${chain} (max age ${maxAgeMinutes}m)`);
+
+  // Use DexScreener token profiles + latest boosts to find new tokens
+  // Then filter by creation time
+  const data = await throttledFetch<DexPair[]>(
+    `${BASE_URL}/token-profiles/latest/v1`
+  ).catch((): DexPair[] => []);
+
+  const raw = Array.isArray(data) ? data : [];
+  const now = Date.now();
+  const maxAgeMs = maxAgeMinutes * 60 * 1000;
+
+  // These are profile entries, not pairs. We need to fetch pair data for each.
+  // Filter by chain first
+  type ProfileEntry = { chainId?: string; tokenAddress?: string; url?: string; description?: string };
+  const chainTokens = (raw as unknown as ProfileEntry[])
+    .filter(t => t.chainId === chain && t.tokenAddress)
+    .slice(0, clampedLimit * 2); // fetch extra in case some don't have pairs
+
+  // Fetch pair data in parallel for each token
+  const pairsResults = await Promise.all(
+    chainTokens.map(async (t): Promise<DexPair | null> => {
+      try {
+        const pair = await getTokenPair(t.tokenAddress!, chain);
+        if (!pair) return null;
+        // Filter by age
+        if (pair.pairCreatedAt && (now - pair.pairCreatedAt) > maxAgeMs) return null;
+        return pair;
+      } catch {
+        return null;
+      }
+    })
+  );
+
+  const validPairs = pairsResults
+    .filter((p): p is DexPair => p !== null)
+    .sort((a, b) => (b.pairCreatedAt ?? 0) - (a.pairCreatedAt ?? 0))
+    .slice(0, clampedLimit);
+
+  debug(`Found ${validPairs.length} new pairs on ${chain}`);
+  return validPairs;
 }
 
 /** Get trending/boosted tokens. Enriches with price data in parallel. */
