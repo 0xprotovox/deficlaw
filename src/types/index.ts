@@ -1,4 +1,4 @@
-// DexScreener pair data
+/** DexScreener pair data from /latest/dex/tokens endpoint */
 export interface DexPair {
   chainId: string;
   dexId: string;
@@ -16,7 +16,40 @@ export interface DexPair {
   pairCreatedAt?: number;
 }
 
-// Normalized holder from GMGN
+/** Normalized price result from DexScreener */
+export interface PriceResult {
+  address: string;
+  symbol: string;
+  name: string;
+  priceUsd: number;
+  priceChange1h: number;
+  priceChange24h: number;
+  volume24h: number;
+  liquidity: number;
+  marketCap: number;
+  dex: string;
+}
+
+/** Boosted/trending token from DexScreener */
+export interface TrendingToken {
+  address: string;
+  symbol: string;
+  name: string;
+  chainId: string;
+  url: string;
+  boostAmount: number;
+}
+
+/** Raw GMGN boost entry from /token-boosts endpoints */
+export interface DexBoostEntry {
+  tokenAddress?: string;
+  chainId?: string;
+  description?: string;
+  url?: string;
+  totalAmount?: number;
+}
+
+/** Normalized holder from GMGN API */
 export interface Holder {
   address: string;
   tags: string[];
@@ -41,7 +74,7 @@ export interface Holder {
   lastActiveAt: string | null;
 }
 
-// Risk assessment
+/** Individual risk flag from analysis */
 export interface RiskFlag {
   type: string;
   severity: 'low' | 'medium' | 'high' | 'critical';
@@ -55,7 +88,7 @@ export interface RiskAssessment {
   summary: string;
 }
 
-// Full token analysis
+/** Complete token analysis result */
 export interface TokenAnalysis {
   token: {
     address: string;
