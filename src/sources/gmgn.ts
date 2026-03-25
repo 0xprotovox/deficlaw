@@ -29,25 +29,34 @@ const holderCache = new MemoryCache<HolderResult>(CACHE_TTL);
  * Returns parsed data on success, null on any failure.
  * Uses async exec to avoid blocking the event loop.
  */
+/** Fast-fail threshold: if curl returns in under this time with non-JSON, skip to Playwright immediately */
+const FAST_FAIL_MS = 500;
+
 function curlFetch(path: string): Promise<Record<string, unknown> | null> {
   return new Promise((resolve) => {
     const url = `${BASE_URL}${path}`;
     const cmd = `curl -s --max-time 10 "${url}" -H "User-Agent: ${UA}"`;
     const start = Date.now();
 
-    exec(cmd, { timeout: 12_000 }, (error, stdout) => {
+    const child = exec(cmd, { timeout: 12_000 }, (error, stdout) => {
       if (error) {
         debug(`curl failed for ${path}: ${error.message}`);
         resolve(null);
         return;
       }
 
+      const elapsed = Date.now() - start;
       const out = stdout.toString();
-      debug(`curl ${path} completed in ${Date.now() - start}ms (${out.length} bytes)`);
+      debug(`curl ${path} completed in ${elapsed}ms (${out.length} bytes)`);
 
-      // Cloudflare sometimes returns HTML instead of JSON
+      // Fast-fail: if curl returned very quickly with HTML/error, don't waste time
+      // This means Cloudflare blocked us instantly — fall through to Playwright
       if (!out || out.startsWith('<!') || out.startsWith('<html')) {
-        debug(`curl ${path} returned HTML (Cloudflare block)`);
+        if (elapsed < FAST_FAIL_MS) {
+          debug(`curl ${path} fast-failed in ${elapsed}ms (Cloudflare block), skipping to fallback`);
+        } else {
+          debug(`curl ${path} returned HTML (Cloudflare block)`);
+        }
         resolve(null);
         return;
       }
@@ -56,7 +65,12 @@ function curlFetch(path: string): Promise<Record<string, unknown> | null> {
       try {
         json = JSON.parse(out);
       } catch {
-        debug(`curl ${path} returned malformed JSON`);
+        // Fast-fail on malformed response too
+        if (elapsed < FAST_FAIL_MS) {
+          debug(`curl ${path} fast-failed in ${elapsed}ms (malformed response)`);
+        } else {
+          debug(`curl ${path} returned malformed JSON`);
+        }
         resolve(null);
         return;
       }
@@ -68,6 +82,13 @@ function curlFetch(path: string): Promise<Record<string, unknown> | null> {
       }
 
       resolve(json.data);
+    });
+
+    // Kill curl early if it hasn't produced output within timeout
+    // The exec timeout is 12s, but we can abort sooner if the process is hung
+    child.on('error', () => {
+      debug(`curl ${path} process error`);
+      resolve(null);
     });
   });
 }
@@ -282,12 +303,18 @@ export async function getHolders(address: string): Promise<HolderResult> {
   if (cached) return cached;
 
   // Strategy 1: curl (fast, ~1s, async to avoid blocking event loop)
+  // Fetch holders and KOLs in parallel for speed
   debug(`Fetching holders for ${address} via curl`);
-  const curlData = await curlFetch(`/token_holders/sol/${address}?limit=100`);
+  const holder_url = `/token_holders/sol/${address}?limit=100`;
+  const kol_url = `/token_holders/sol/${address}?tag=renowned&limit=50`;
+
+  const [curlData, kolData] = await Promise.all([
+    curlFetch(holder_url),
+    curlFetch(kol_url),
+  ]);
+
   if (curlData && Array.isArray((curlData as Record<string, unknown>).list) &&
       ((curlData as Record<string, unknown>).list as unknown[]).length > 0) {
-    // Fetch KOL holders in parallel (now truly async)
-    const kolData = await curlFetch(`/token_holders/sol/${address}?tag=renowned&limit=50`);
     const holders = normalizeHolders((curlData as Record<string, unknown>).list);
     const kolHolders = normalizeHolders(
       kolData ? (kolData as Record<string, unknown>).list : []
