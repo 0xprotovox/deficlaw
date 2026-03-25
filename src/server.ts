@@ -14,27 +14,105 @@ import { handleSearchToken } from './tools/searchToken.js';
 import { handleGetNewLaunches } from './tools/getNewLaunches.js';
 import { formatAnalysis } from './analysis/formatOutput.js';
 
+/** Build a compact response with only essential fields (3x smaller) */
+function buildCompactResult(result: Record<string, unknown>): Record<string, unknown> {
+  const compact: Record<string, unknown> = {};
+
+  // Summary text
+  if (result.summary) compact.summary = result.summary;
+
+  // Price (just USD + 24h change)
+  const price = result.price as Record<string, unknown> | undefined;
+  if (price) {
+    compact.price = {
+      usd: price.usd,
+      change24h: price.change24h,
+      change1h: price.change1h,
+    };
+  }
+
+  // Token basics
+  const token = result.token as Record<string, unknown> | undefined;
+  if (token) {
+    compact.token = {
+      symbol: token.symbol,
+      name: token.name,
+      address: token.address,
+      age: token.age,
+    };
+  }
+
+  // Risk score + level only
+  const risk = result.risk as Record<string, unknown> | undefined;
+  if (risk) {
+    compact.risk = {
+      score: risk.score,
+      level: risk.level,
+      summary: risk.summary,
+    };
+  }
+
+  // Top 5 holders only (not 20)
+  const holders = result.holders as Record<string, unknown> | undefined;
+  if (holders) {
+    const topHolders = holders.topHolders as unknown[] | undefined;
+    compact.holders = {
+      total: holders.total,
+      top5Pct: (holders.concentration as Record<string, unknown>)?.top5Pct,
+      topHolders: topHolders ? topHolders.slice(0, 5) : [],
+    };
+  }
+
+  // Market basics
+  const market = result.market as Record<string, unknown> | undefined;
+  if (market) {
+    compact.market = {
+      marketCap: market.marketCap,
+      liquidity: market.liquidity,
+      volume24h: market.volume24h,
+    };
+  }
+
+  // Meta
+  compact.meta = result.meta;
+
+  return compact;
+}
+
 export function createServer(): McpServer {
   const server = new McpServer({
     name: 'deficlaw',
-    version: '0.3.0',
+    version: '0.4.0',
   });
 
   // ── analyze_token ──
   server.tool(
     'analyze_token',
-    'Full token analysis: price, volume, liquidity, holder intelligence, risk scoring. Supports Solana tokens with GMGN holder data.',
+    'Full token analysis: price, volume, liquidity, holder intelligence, risk scoring. Supports Solana tokens with GMGN holder data. Use quick=true for fast price-only analysis (<1s). Use compact=true for smaller response (top 5 holders, no full details).',
     {
       address: z.string().min(1).describe('Token contract address (e.g. Solana mint address)'),
       chain: z.string().default('solana').describe('Blockchain: solana, ethereum, bsc, base, arbitrum'),
       include_holders: z.boolean().default(true).describe('Include GMGN holder analysis (slower, needs curl or Playwright)'),
+      quick: z.boolean().default(false).describe('Quick mode: skip holders, return price/market/risk only (<1s)'),
+      compact: z.boolean().default(false).describe('Compact mode: return summary, price, risk score, top 5 holders, verdict only (3x smaller response)'),
     },
     async (args) => {
       try {
-        const result = await handleAnalyzeToken(args);
+        // Quick mode overrides include_holders
+        const effectiveArgs = args.quick
+          ? { ...args, include_holders: false }
+          : args;
+        const result = await handleAnalyzeToken(effectiveArgs);
         if ('error' in result && typeof result.error === 'string') {
           return { content: [{ type: 'text' as const, text: JSON.stringify(result) }], isError: true };
         }
+
+        // Compact mode: return only essential fields
+        if (args.compact) {
+          const compact = buildCompactResult(result);
+          return { content: [{ type: 'text' as const, text: JSON.stringify(compact, null, 2) }] };
+        }
+
         const formatted = formatAnalysis(result as unknown as Parameters<typeof formatAnalysis>[0]);
         return { content: [{ type: 'text' as const, text: formatted }] };
       } catch (err: unknown) {
