@@ -12,6 +12,9 @@ import { handleGetTrending } from './tools/getTrending.js';
 import { handleGetTopTraders } from './tools/getTopTraders.js';
 import { handleSearchToken } from './tools/searchToken.js';
 import { handleGetNewLaunches } from './tools/getNewLaunches.js';
+import { handleEstimateSlippage } from './tools/estimateSlippage.js';
+import { handleCompareTokens } from './tools/compareTokens.js';
+import { handleGetTokenSecurity } from './tools/getTokenSecurity.js';
 import { formatAnalysis } from './analysis/formatOutput.js';
 
 /** Build a compact response with only essential fields (3x smaller) */
@@ -227,6 +230,65 @@ export function createServer(): McpServer {
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);
         return { content: [{ type: 'text' as const, text: JSON.stringify({ error: `New launches fetch failed: ${message}` }) }], isError: true };
+      }
+    }
+  );
+
+  // ── estimate_slippage ──
+  server.tool(
+    'estimate_slippage',
+    'Estimate buy slippage for a Solana token at $50, $100, $500, $1000. Uses Jupiter quotes.',
+    {
+      address: z.string().min(1).describe('Solana token mint address'),
+    },
+    async (args) => {
+      try {
+        const result = await handleEstimateSlippage(args);
+        if ('error' in result) return { content: [{ type: 'text' as const, text: JSON.stringify(result) }], isError: true };
+        return { content: [{ type: 'text' as const, text: result.summary }] };
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: `Slippage estimation failed: ${message}` }) }], isError: true };
+      }
+    }
+  );
+
+  // ── compare_tokens ──
+  server.tool(
+    'compare_tokens',
+    'Compare two tokens side by side: price, mcap, volume, liquidity, age, holders.',
+    {
+      address_a: z.string().min(1).describe('First token address'),
+      address_b: z.string().min(1).describe('Second token address'),
+      chain: z.string().default('solana').describe('Blockchain'),
+    },
+    async (args) => {
+      try {
+        const result = await handleCompareTokens(args);
+        if ('error' in result) return { content: [{ type: 'text' as const, text: JSON.stringify(result) }], isError: true };
+        return { content: [{ type: 'text' as const, text: result.summary }] };
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: `Comparison failed: ${message}` }) }], isError: true };
+      }
+    }
+  );
+
+  // ── get_token_security ──
+  server.tool(
+    'get_token_security',
+    'Quick security check: mint authority, freeze authority, supply. Solana only. "Is this token safe?"',
+    {
+      address: z.string().min(1).describe('Solana token mint address'),
+    },
+    async (args) => {
+      try {
+        const result = await handleGetTokenSecurity(args);
+        if ('error' in result) return { content: [{ type: 'text' as const, text: JSON.stringify(result) }], isError: true };
+        return { content: [{ type: 'text' as const, text: result.summary }] };
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ error: `Security check failed: ${message}` }) }], isError: true };
       }
     }
   );

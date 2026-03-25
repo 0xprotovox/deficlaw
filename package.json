@@ -1,6 +1,6 @@
 {
   "name": "@0xprotovox/deficlaw",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "DeFi MCP Server for Claude Code — token analysis, prices, trending, holder intelligence",
   "author": "0xprotovox",
   "license": "MIT",
