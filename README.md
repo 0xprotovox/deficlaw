@@ -51,16 +51,71 @@ npm install && npm run build
 claude mcp add defi -- node /path/to/deficlaw/dist/index.js
 ```
 
-Then just ask Claude naturally:
+That's it. No API keys, no config files, no accounts needed.
 
+## Quick Start Guide
+
+Once installed, open Claude Code and try these commands. Just type naturally:
+
+### Check a token price (fastest, ~300ms)
 ```
-> "analyze this token: 3oQw...pump"
-> "what's the price of BONK?"
-> "search for BONK token"
-> "show me new launches on solana in the last 30 minutes"
-> "show me trending tokens on solana"
-> "who made money on JUP token?"
+> what's the price of BONK?
+> price of JUP
+> how much is SOL right now?
 ```
+
+### Quick token scan (~350ms, no holder data)
+```
+> quick analyze So11111...
+> give me a quick look at this token: 3oQw...pump
+```
+
+### Full deep analysis (~1.5s, with holders + risk + verdict)
+```
+> analyze token 3oQwNvAfZMuPWjVPC12ukY7RPA9JiGwLod6Pr4Lkpump
+> deep analyze JUP token
+> is this token safe? EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v
+```
+
+### Compact analysis (small response, top 5 holders only)
+```
+> compact analyze 3oQw...pump
+> give me a brief analysis of BONK
+```
+
+### Search tokens by name
+```
+> search for BONK
+> find tokens named "dog"
+> search Jupiter token
+```
+
+### Trending tokens
+```
+> what's trending on solana?
+> show me trending tokens on ethereum
+> top tokens on base right now
+```
+
+### New launches
+```
+> show new launches on solana in the last 30 minutes
+> any new tokens launched in the last hour?
+```
+
+### Who made money?
+```
+> who profited on this token: 3oQw...pump?
+> show me top traders on JUP
+> who lost money on BONK?
+```
+
+### Pro tips
+- Use **quick mode** for fast scans when you just need price + risk
+- Use **compact mode** when you want holder data but don't need the full 20-holder table
+- **Paste any Solana token address** and ask "is this safe?" for instant security + risk check
+- Chain commands: "analyze this token and tell me if I should buy it"
+- Works with **any chain** for prices: solana, ethereum, base, bsc, arbitrum
 
 ## Tools
 
