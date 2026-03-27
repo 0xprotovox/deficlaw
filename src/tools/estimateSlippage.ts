@@ -1,21 +1,17 @@
 /**
- * estimate_slippage tool — Jupiter-based slippage estimation for Solana tokens.
- * Shows price impact for $50, $100, $500, $1000 buys.
- * Uses Jupiter Quote API (free, no auth).
+ * estimate_slippage tool — Liquidity-based slippage estimation
+ * Uses DexScreener pool data to estimate price impact at $50/$100/$500/$1000
  */
-import { estimateSlippage, type SlippageEstimate } from '../sources/jupiter.js';
-import { getPrice } from '../sources/dexscreener.js';
-import { getTokenSecurity } from '../sources/solanaRpc.js';
-import { debug } from '../utils/debug.js';
-
-const SOL_MINT = 'So11111111111111111111111111111111111111112';
+import { estimateSlippageFromLiquidity, type SlippageEstimate } from '../sources/jupiter.js';
+import { getPrice, getTokenPair } from '../sources/dexscreener.js';
 
 interface SlippageResult {
   token: string;
   symbol: string;
   name: string;
   currentPriceUsd: number;
-  solPriceUsd: number;
+  liquidityUsd: number;
+  dex: string;
   estimates: SlippageEstimate[];
   summary: string;
   fetchedAt: string;
@@ -29,63 +25,69 @@ export async function handleEstimateSlippage(args: {
   }
 
   const address = args.address.trim();
-  debug(`Estimating slippage for ${address}`);
-
-  // Get SOL price first
-  const solPrice = await getPrice(SOL_MINT, 'solana');
-  if (!solPrice) {
-    return { error: 'Could not fetch SOL price. DexScreener may be temporarily unavailable.' };
+  const pair = await getTokenPair(address, 'solana');
+  if (!pair) {
+    return { error: `Token not found on DexScreener: ${address}. Check the address or try searching by name.` };
   }
 
-  // Get token info
-  const tokenPrice = await getPrice(address, 'solana');
-  if (!tokenPrice) {
-    return { error: `Token not found on DexScreener: ${address}. Check the address or try searching by name with search_token.` };
+  const priceUsd = parseFloat(pair.priceUsd) || 0;
+  const liquidityUsd = pair.liquidity?.usd || 0;
+  const symbol = pair.baseToken.symbol;
+  const name = pair.baseToken.name;
+  const dex = pair.dexId;
+
+  if (liquidityUsd <= 0) {
+    return { error: `No liquidity data for ${symbol}. Cannot estimate slippage.` };
   }
 
-  // Fetch actual token decimals from Solana RPC (falls back to 6 if unavailable)
-  const security = await getTokenSecurity(address).catch(() => null);
-  const tokenDecimals = security?.decimals ?? 6;
-
-  const estimates = await estimateSlippage(address, solPrice.priceUsd, tokenDecimals);
+  const estimates = estimateSlippageFromLiquidity(priceUsd, liquidityUsd, dex);
 
   if (estimates.length === 0) {
-    return { error: `No Jupiter routes found for ${tokenPrice.symbol}. The token may not have enough liquidity on Jupiter-supported DEXes.` };
+    return { error: `Could not estimate slippage for ${symbol}.` };
   }
 
   // Build summary
-  const summaryParts: string[] = [];
-  summaryParts.push(`Slippage estimates for ${tokenPrice.symbol} (${tokenPrice.name}):`);
+  const lines: string[] = [];
+  lines.push(`Slippage estimates for ${symbol} (${name}):`);
+  lines.push(`Pool liquidity: $${liquidityUsd.toLocaleString()} on ${dex}`);
+  lines.push('');
 
   for (const est of estimates) {
-    const impactStr = est.priceImpactPct > 1
-      ? `${est.priceImpactPct.toFixed(2)}% (HIGH)`
-      : est.priceImpactPct > 0.3
-        ? `${est.priceImpactPct.toFixed(2)}% (moderate)`
-        : `${est.priceImpactPct.toFixed(4)}% (low)`;
-    summaryParts.push(`  $${est.buyAmountUsd}: ${est.estimatedOutput.toFixed(2)} ${tokenPrice.symbol}, price impact ${impactStr}, via ${est.route}`);
+    const impactStr = est.priceImpactPct > 5
+      ? `${est.priceImpactPct.toFixed(2)}% (VERY HIGH)`
+      : est.priceImpactPct > 1
+        ? `${est.priceImpactPct.toFixed(2)}% (HIGH)`
+        : est.priceImpactPct > 0.3
+          ? `${est.priceImpactPct.toFixed(3)}% (moderate)`
+          : `${est.priceImpactPct.toFixed(4)}% (low)`;
+    lines.push(`  $${est.buyAmountUsd}: ~${est.estimatedOutput.toLocaleString()} ${symbol}, price impact ${impactStr}`);
   }
 
   // Overall assessment
   const maxImpact = Math.max(...estimates.map(e => e.priceImpactPct));
+  lines.push('');
   if (maxImpact > 5) {
-    summaryParts.push(`\nWARNING: Very high price impact even at small sizes. Extremely illiquid token.`);
+    lines.push('WARNING: Very high price impact. Extremely illiquid token. Trade tiny amounts only.');
   } else if (maxImpact > 2) {
-    summaryParts.push(`\nCaution: Significant price impact at larger sizes. Trade in smaller amounts.`);
+    lines.push('Caution: Significant price impact at larger sizes. Trade in smaller amounts.');
   } else if (maxImpact > 0.5) {
-    summaryParts.push(`\nModerate liquidity. $100-500 buys are reasonable, larger sizes will move the price.`);
+    lines.push('Moderate liquidity. $100-500 buys are reasonable, larger sizes will move the price.');
   } else {
-    summaryParts.push(`\nGood liquidity. All tested buy sizes have low price impact.`);
+    lines.push('Good liquidity. All tested buy sizes have low price impact.');
   }
+
+  lines.push('');
+  lines.push('(Estimated from pool liquidity using constant-product AMM formula. Actual slippage may vary by DEX and route.)');
 
   return {
     token: address,
-    symbol: tokenPrice.symbol,
-    name: tokenPrice.name,
-    currentPriceUsd: tokenPrice.priceUsd,
-    solPriceUsd: solPrice.priceUsd,
+    symbol,
+    name,
+    currentPriceUsd: priceUsd,
+    liquidityUsd,
+    dex,
     estimates,
-    summary: summaryParts.join('\n'),
+    summary: lines.join('\n'),
     fetchedAt: new Date().toISOString(),
   };
 }
