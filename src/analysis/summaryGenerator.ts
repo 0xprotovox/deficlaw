@@ -133,7 +133,11 @@ export function generateSummary(data: SummaryInput): string {
     }
 
     // Buy/sell pressure
-    if (pressure.buySellRatio > 5) {
+    // Guard against misleading ratios from near-zero tx counts (e.g., 0 buys / 1 sell)
+    const totalTx = pressure.totalBuyTx + pressure.totalSellTx;
+    if (totalTx < 3) {
+      lines.push(`Very low trading activity (${pressure.totalBuyTx} buys, ${pressure.totalSellTx} sells), not enough data for pressure analysis.`);
+    } else if (pressure.buySellRatio > 5) {
       lines.push(`Extreme buy pressure at ${pressure.buySellRatio.toFixed(1)}:1 ratio (${pressure.totalBuyTx} buys vs ${pressure.totalSellTx} sells), heavy accumulation.`);
     } else if (pressure.buySellRatio > 3) {
       lines.push(`Buy pressure is strong at ${pressure.buySellRatio.toFixed(1)}:1 ratio (${pressure.totalBuyTx} buys vs ${pressure.totalSellTx} sells), accumulation phase.`);
@@ -311,8 +315,12 @@ function computeVerdict(data: SummaryInput): Verdict {
     if (holders.sentiment.profitRatio > 0.50) bullPoints += 1;
     else if (holders.sentiment.profitRatio < 0.15) bearPoints += 1;
 
-    if (holders.pressure.buySellRatio > 2) bullPoints += 1;
-    else if (holders.pressure.buySellRatio < 0.5) bearPoints += 1;
+    // Only count buy/sell ratio as a signal if there are enough transactions
+    const totalTxForVerdict = holders.pressure.totalBuyTx + holders.pressure.totalSellTx;
+    if (totalTxForVerdict >= 5) {
+      if (holders.pressure.buySellRatio > 2) bullPoints += 1;
+      else if (holders.pressure.buySellRatio < 0.5) bearPoints += 1;
+    }
 
     if (holders.concentration.top10Pct > 0.50) bearPoints += 1;
     if (holders.categories.snipers > 5) bearPoints += 1;

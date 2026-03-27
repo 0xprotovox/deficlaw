@@ -116,7 +116,9 @@ function classifyHolders(holders: Holder[]): HolderClassification {
     pressure: {
       totalBuyVolume,
       totalSellVolume,
-      buySellRatio: totalSellVolume > 0 ? totalBuyVolume / totalSellVolume : (totalBuyVolume > 0 ? Infinity : 0),
+      buySellRatio: totalSellVolume > 0
+        ? Math.min(totalBuyVolume / totalSellVolume, 999999)
+        : (totalBuyVolume > 0 ? Infinity : 0),
       totalBuyTx,
       totalSellTx,
     },

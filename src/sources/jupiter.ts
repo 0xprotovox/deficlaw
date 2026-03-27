@@ -8,7 +8,7 @@ import { debug } from '../utils/debug.js';
 
 const BASE_URL = 'https://api.jup.ag/quote/v1';
 const CACHE_TTL = 30_000; // 30s cache for quotes
-const SOL_MINT = 'So11111111111111111111111111111111111112';
+const SOL_MINT = 'So11111111111111111111111111111111111111112';
 const SOL_DECIMALS = 9;
 
 export interface JupiterQuote {

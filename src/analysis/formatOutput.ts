@@ -199,7 +199,9 @@ export function formatAnalysis(data: AnalysisData): string {
     lines.push(`  Sell TX: ${h.pressure.totalSellTx}`);
     const ratioStr = h.pressure.buySellRatio === Infinity
       ? 'all buys'
-      : `${h.pressure.buySellRatio.toFixed(2)}:1`;
+      : h.pressure.buySellRatio > 10000
+        ? `${Math.round(h.pressure.buySellRatio).toLocaleString()}:1 (unreliable, low tx count)`
+        : `${h.pressure.buySellRatio.toFixed(2)}:1`;
     const ratioIndicator = h.pressure.buySellRatio > 1.5 ? ' (bullish)'
       : h.pressure.buySellRatio < 0.7 ? ' (bearish)'
       : ' (neutral)';

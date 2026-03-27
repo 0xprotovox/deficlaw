@@ -85,7 +85,7 @@ function buildCompactResult(result: Record<string, unknown>): Record<string, unk
 export function createServer(): McpServer {
   const server = new McpServer({
     name: 'deficlaw',
-    version: '0.4.0',
+    version: '0.6.0',
   });
 
   // ── analyze_token ──

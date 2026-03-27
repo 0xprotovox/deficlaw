@@ -29,7 +29,7 @@ async function bench(name: string, fn: () => Promise<string>): Promise<BenchResu
 }
 
 async function main() {
-  console.log('deficlaw v0.4.0 — Speed Benchmarks');
+  console.log('deficlaw v0.6.0 — Speed Benchmarks');
   console.log('='.repeat(70));
   console.log(`Test token: ${TEST_TOKEN}`);
   console.log(`Test search: "${TEST_SEARCH}"`);

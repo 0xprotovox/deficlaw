@@ -5,9 +5,10 @@
  */
 import { estimateSlippage, type SlippageEstimate } from '../sources/jupiter.js';
 import { getPrice } from '../sources/dexscreener.js';
+import { getTokenSecurity } from '../sources/solanaRpc.js';
 import { debug } from '../utils/debug.js';
 
-const SOL_MINT = 'So11111111111111111111111111111111111112';
+const SOL_MINT = 'So11111111111111111111111111111111111111112';
 
 interface SlippageResult {
   token: string;
@@ -42,9 +43,9 @@ export async function handleEstimateSlippage(args: {
     return { error: `Token not found on DexScreener: ${address}. Check the address or try searching by name with search_token.` };
   }
 
-  // Estimate decimals from price (rough heuristic, Jupiter will handle actual decimals)
-  // We'll use 6 as default for most SPL tokens, 9 for SOL-like
-  const tokenDecimals = 6; // Most SPL tokens use 6 decimals
+  // Fetch actual token decimals from Solana RPC (falls back to 6 if unavailable)
+  const security = await getTokenSecurity(address).catch(() => null);
+  const tokenDecimals = security?.decimals ?? 6;
 
   const estimates = await estimateSlippage(address, solPrice.priceUsd, tokenDecimals);
 
